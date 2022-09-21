@@ -1,0 +1,74 @@
+---
+title: "modify the simple function"
+author: "Gasper Qian"
+date: "2018Äê12ÔÂ24ÈÕ"
+output: html_document
+---
+
+```{r}
+sim.scr <- function(pars, region.lims, traps, sigma.toa, mu.rates){
+Da <- pars[1]
+g0 <- pars[2]
+sigma <- pars[3]
+Dc <- pars[4]
+speed <- 343
+
+region.area <- (region.lims[2] - region.lims[1])*
+(region.lims[4] - region.lims[3])/10000
+## Extracting number of detectors.
+n.traps <- nrow(traps)
+## Simulating number of animals.
+n.acs <- rpois(1, D*region.area)
+
+## Simulating activity centre locations.
+ac.locs.x <- runif(n.acs, region.lims[1], region.lims[2])
+ac.locs.y <- runif(n.acs, region.lims[3], region.lims[4])
+ac.loc <- cbind(ac.locs.x, ac.locs.y)
+ID <- seq.int(nrow(ac.loc))
+ac.locs <- cbind(ac.loc,ID)#location of animals 
+
+##simulating call centre locations depend on activity centre locations.
+dupnum <- rpois(n.acs,mu.rates)
+ac.locs[rep(1:nrow(ac.locs),dupnum),]
+
+## Calculating a matrix of differences between activity centres and detectors.
+dists <- crossdist(ac.locs[, 1], ac.locs[, 2],
+traps[, 1], traps[, 2])
+## Calculating detection probabilities.
+det.probs <- g0*exp(-dists^2/(2*sigma^2))
+## Creating capture histories with ID.
+capts.full <- matrix(rbinom(nrow(ac.locs)*n.traps, 1, det.probs),
+nrow = nrow(ac.locs), ncol = n.traps)
+capt.full <- cbind(capts.full, ac.locs[,ncol(ac.locs)])
+colnames(capt.full)[ncol(capt.full)] <- "ID"
+## We only observe capture histories with at least one detection.
+capt$bincapt <- capt.full[apply(capt.full[,1:ncol(capt.full)-1], 1, sum) > 0, ]
+
+## get the time for each arrival depends on the sd of random error
+timerec <- matrix(data = NA, nrow = nrow(dists), ncol = ncol(dists))
+for(i in 1: nrow(dists)){
+  for(j in 1: ncol(dists)){
+    timerec[i,j] <- round(runif(1,0,25) + dists[i,j]*speed + rnorm(1,0,sigma.toa),4)
+  }
+}
+which(timerec > 25) <- 0#clean the data
+timerecs <- cbind(timerec,ID)
+timerecs[which(capt.full[,1:ncol(capt.full-1)] == 0)] <- 0
+timerecs
+capt$toa <- timerecs[apply(timerecs[,1:ncol(timerecs)-1],1,sum)>0, ]
+
+capt
+}
+#Requirement
+#Each animal makes multiple calls from the same location. The number of calls emitted by a single animal comes from a Poisson distribution, with an expectation that is set by the parameters inputted to your function.
+
+#Each detection of a call is associated with a time-of-arrival of the sound (in seconds). Usually the standard deviation of the time-of-arrival error is pretty small, because our microphones are accurate. In the model fitted in my example, the standard deviation is 0.00323 seconds.
+
+load("scr-data.RData")
+
+
+```
+
+
+
+
